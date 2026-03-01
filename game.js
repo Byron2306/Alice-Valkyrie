@@ -459,7 +459,7 @@
         return Promise.all(Object.entries(ASSETS).map(([key, cfg]) => {
             return new Promise(resolve => {
                 const img = new Image();
-                img.onload = () => { images[key] = removeGray(img); resolve(); };
+                img.onload = () => { try { images[key] = removeGray(img); } catch(e) { console.warn('removeGray failed, using original image:', e.message); images[key] = img; } resolve(); };
                 img.onerror = () => { console.error('Failed:', cfg.path); resolve(); };
                 img.src = cfg.path;
             });
