@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Alice: Valkyrie Star</title>
+    <style>
+        /* Reset margin/padding so the canvas fills the page */
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #111;
+        }
+        #gameCanvas {
+            display: block;
+        }
+        /* Title screen styling */
+        #title-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            z-index: 10;
+            font-family: sans-serif;
+            text-align: center;
+        }
+        #title-screen h1 {
+            margin: 0 0 20px 0;
+            font-size: 64px;
+            line-height: 1.2;
+            text-shadow: 0 4px 8px rgba(0, 0, 0, 0.6);
+        }
+        #start-button {
+            padding: 12px 24px;
+            font-size: 32px;
+            border: none;
+            border-radius: 8px;
+            background: #0077cc;
+            color: #fff;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+        }
+        #start-button:hover {
+            background: #0090ff;
+        }
+        /* Title background image */
+        #title-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: -1;
+            filter: brightness(0.8);
+        }
+    </style>
+</head>
+<body>
+    <!-- Title screen overlay -->
+    <div id="title-screen">
+        <img id="title-bg" src="assets/title_bg.png" alt="Title Background">
+        <h1>Alice: Valkyrie Star</h1>
+        <button id="start-button" onclick="startGame()">Start Game</button>
+    </div>
+    <!-- Game canvas -->
+    <canvas id="gameCanvas" width="1024" height="640"></canvas>
+    <script src="game.js"></script>
+</body>
+</html>

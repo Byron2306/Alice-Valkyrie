@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sprite Sheet Debug</title>
+    <style>
+        body { background: #333; color: #fff; font-family: monospace; margin: 20px; }
+        .sheet { margin: 20px 0; border: 2px solid #fff; display: inline-block; position: relative; }
+        .sheet img { display: block; }
+        .grid-overlay { position: absolute; top: 0; left: 0; pointer-events: none; }
+        h2 { margin-top: 40px; }
+        .info { background: #222; padding: 10px; margin: 10px 0; }
+        input[type="number"] { width: 60px; }
+    </style>
+</head>
+<body>
+    <h1>Sprite Sheet Analysis</h1>
+    
+    <div>
+        <label>Grid Size: <input type="number" id="gridSize" value="128" onchange="updateGrids()"> px</label>
+    </div>
+
+    <h2>52708.png - Tileset (Level Assets)</h2>
+    <div class="info" id="info-tileset"></div>
+    <div class="sheet" id="sheet-tileset">
+        <img src="assets/52708.png" id="img-tileset" onload="analyzeImage(this, 'tileset')">
+        <canvas class="grid-overlay" id="grid-tileset"></canvas>
+    </div>
+
+    <h2>52668.png - Character Animations</h2>
+    <div class="info" id="info-character"></div>
+    <div class="sheet" id="sheet-character">
+        <img src="assets/52668.png" id="img-character" onload="analyzeImage(this, 'character')">
+        <canvas class="grid-overlay" id="grid-character"></canvas>
+    </div>
+
+    <h2>52707.png - Enemy Sprites</h2>
+    <div class="info" id="info-enemy"></div>
+    <div class="sheet" id="sheet-enemy">
+        <img src="assets/52707.png" id="img-enemy" onload="analyzeImage(this, 'enemy')">
+        <canvas class="grid-overlay" id="grid-enemy"></canvas>
+    </div>
+
+    <h2>52671.png - Title Screen</h2>
+    <div class="info" id="info-title"></div>
+    <div class="sheet" id="sheet-title">
+        <img src="assets/52671.png" id="img-title" onload="analyzeImage(this, 'title')" style="max-width: 800px;">
+    </div>
+
+    <script>
+        const images = {};
+        
+        function analyzeImage(img, name) {
+            images[name] = img;
+            const gridSize = parseInt(document.getElementById('gridSize').value);
+            const cols = Math.floor(img.naturalWidth / gridSize);
+            const rows = Math.floor(img.naturalHeight / gridSize);
+            
+            document.getElementById('info-' + name).innerHTML = 
+                `Dimensions: ${img.naturalWidth} x ${img.naturalHeight} | ` +
+                `Grid ${gridSize}px: ${cols} cols x ${rows} rows = ${cols * rows} tiles`;
+            
+            drawGrid(name, img, gridSize);
+        }
+        
+        function drawGrid(name, img, gridSize) {
+            const canvas = document.getElementById('grid-' + name);
+            if (!canvas) return;
+            
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            const ctx = canvas.getContext('2d');
+            
+            ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
+            ctx.lineWidth = 1;
+            ctx.font = '10px monospace';
+            ctx.fillStyle = 'rgba(255, 255, 0, 0.9)';
+            
+            const cols = Math.floor(img.naturalWidth / gridSize);
+            const rows = Math.floor(img.naturalHeight / gridSize);
+            
+            // Draw grid lines
+            for (let x = 0; x <= img.naturalWidth; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, img.naturalHeight);
+                ctx.stroke();
+            }
+            for (let y = 0; y <= img.naturalHeight; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(img.naturalWidth, y);
+                ctx.stroke();
+            }
+            
+            // Draw tile indices
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    const index = row * cols + col;
+                    ctx.fillText(index, col * gridSize + 3, row * gridSize + 12);
+                }
+            }
+        }
+        
+        function updateGrids() {
+            const gridSize = parseInt(document.getElementById('gridSize').value);
+            for (const name in images) {
+                analyzeImage(images[name], name);
+            }
+        }
+    </script>
+</body>
+</html>
