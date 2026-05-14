@@ -50,13 +50,13 @@
     // Asset names mapped to file paths. Additional sprite sheets
     // can be added here and referenced later in the animations.
     const assetList = {
-        tileset: 'assets/tileset.png',
-        idle: 'assets/angel_idle.png',
-        run: 'assets/angel_run.png',
-        jump: 'assets/angel_jump.png',
-        attack: 'assets/angel_attack_spear.png',
-        hurt: 'assets/angel_hurt_death.png',
-        fx: 'assets/angel_fx.png'
+        tileset: 'tileset.png',
+        idle: 'angel_idle.png',
+        run: 'angel_run.png',
+        jump: 'angel_jump.png',
+        attack: 'angel_attack_spear.png',
+        hurt: 'angel_hurt_death.png',
+        fx: 'angel_fx.png'
     };
 
     // Loaded images will be stored here after preloading.
