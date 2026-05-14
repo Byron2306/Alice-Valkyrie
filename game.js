@@ -19,7 +19,8 @@
         throw new Error('Unable to resolve game script URL for asset loading.');
     }
     const scriptUrl = new URL(currentScript.src, window.location.href);
-    const assetBaseUrl = scriptUrl.pathname.includes('/assets/')
+    const scriptDirectory = scriptUrl.pathname.split('/').slice(-2, -1)[0];
+    const assetBaseUrl = scriptDirectory === 'assets'
         ? new URL('../', scriptUrl)
         : new URL('./', scriptUrl);
 
