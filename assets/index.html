@@ -8,7 +8,9 @@
             const path = window.location.pathname;
             const isFilePath = /\/[^/]+\.[^/]+$/.test(path);
             if (!path.endsWith('/') && !isFilePath) {
-                window.location.replace(`${window.location.origin}${path}/${window.location.search}${window.location.hash}`);
+                const redirectUrl = new URL(window.location.href);
+                redirectUrl.pathname = `${path}/`;
+                window.location.replace(redirectUrl.toString());
             }
         })();
     </script>
