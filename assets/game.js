@@ -14,7 +14,8 @@
 (function() {
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
-    const scriptUrl = new URL(document.currentScript?.src || window.location.href);
+    const currentScript = document.currentScript || document.querySelector('script[src$="game.js"]');
+    const scriptUrl = new URL(currentScript?.src || 'game.js', window.location.href);
     const assetBaseUrl = scriptUrl.pathname.includes('/assets/')
         ? new URL('../', scriptUrl)
         : new URL('./', scriptUrl);
