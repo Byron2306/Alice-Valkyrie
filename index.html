@@ -3,6 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <title>Alice: Valkyrie Star</title>
+    <script>
+        (() => {
+            const path = window.location.pathname;
+            const isFilePath = path.split('/').pop().includes('.');
+            if (!path.endsWith('/') && !isFilePath) {
+                window.location.replace(`${window.location.origin}${path}/${window.location.search}${window.location.hash}`);
+            }
+        })();
+    </script>
     <style>
         /* Reset margin/padding so the canvas fills the page */
         html, body {
