@@ -3,6 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <title>Alice: Valkyrie Star</title>
+    <script>
+        (() => {
+            const path = window.location.pathname;
+            const isFilePath = /\/[^/]+\.[^/]+$/.test(path);
+            if (!path.endsWith('/') && !isFilePath) {
+                const redirectUrl = new URL(window.location.href);
+                redirectUrl.pathname = `${path}/`;
+                window.location.replace(redirectUrl.toString());
+            }
+        })();
+    </script>
     <style>
         /* Reset margin/padding so the canvas fills the page */
         html, body {
