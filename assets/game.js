@@ -14,6 +14,15 @@
 (function() {
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
+    const currentScript = document.currentScript || document.querySelector('script[data-game-script="true"]');
+    if (!currentScript || !currentScript.src) {
+        throw new Error('Unable to resolve game script URL for asset loading.');
+    }
+    const scriptUrl = new URL(currentScript.src, window.location.href);
+    const scriptDirectory = scriptUrl.pathname.split('/').slice(-2, -1)[0];
+    const assetBaseUrl = scriptDirectory === 'assets'
+        ? new URL('../', scriptUrl)
+        : new URL('./', scriptUrl);
 
     // Canvas scaling factor. The original sprite sheets use 128×128
     // pixel frames. We scale everything down by 0.5 to fit more
@@ -111,7 +120,7 @@
         const promises = [];
         for (const key in assetList) {
             const img = new Image();
-            img.src = assetList[key];
+            img.src = new URL(assetList[key], assetBaseUrl).toString();
             images[key] = img;
             promises.push(new Promise((resolve) => {
                 img.onload = () => resolve();
