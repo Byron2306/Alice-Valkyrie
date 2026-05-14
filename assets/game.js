@@ -14,14 +14,11 @@
 (function() {
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
-    const currentScript = document.currentScript || Array.from(document.scripts).find((script) => {
-        if (!script.src) return false;
-        const scriptPath = new URL(script.src, window.location.href).pathname;
-        return scriptPath.endsWith('/game.js') || scriptPath.endsWith('/assets/game.js');
-    });
-    const scriptUrl = currentScript
-        ? new URL(currentScript.src, window.location.href)
-        : new URL(window.location.pathname.includes('/assets/') ? '../game.js' : 'game.js', window.location.href);
+    const currentScript = document.currentScript || document.querySelector('script[data-game-script="true"]');
+    if (!currentScript || !currentScript.src) {
+        throw new Error('Unable to resolve game script URL for asset loading.');
+    }
+    const scriptUrl = new URL(currentScript.src, window.location.href);
     const assetBaseUrl = scriptUrl.pathname.includes('/assets/')
         ? new URL('../', scriptUrl)
         : new URL('./', scriptUrl);
