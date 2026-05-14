@@ -2,86 +2,124 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Alice: Valkyrie Star</title>
-    <script>
-        (() => {
-            const path = window.location.pathname;
-            const isFilePath = /\/[^/]+\.[^/]+$/.test(path);
-            if (!path.endsWith('/') && !isFilePath) {
-                const redirectUrl = new URL(window.location.href);
-                redirectUrl.pathname = `${path}/`;
-                window.location.replace(redirectUrl.toString());
-            }
-        })();
-    </script>
     <style>
-        /* Reset margin/padding so the canvas fills the page */
-        html, body {
+        * {
             margin: 0;
             padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
             overflow: hidden;
-            background: #111;
+            background: #000;
+            font-family: Arial, sans-serif;
         }
         #gameCanvas {
             display: block;
-        }
-        /* Title screen styling */
-        #title-screen {
-            position: absolute;
-            top: 0;
-            left: 0;
             width: 100%;
             height: 100%;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
+            touch-action: none;
+        }
+
+        #rotateNotice {
+            position: fixed;
+            inset: 0;
+            display: none;
             align-items: center;
-            color: #fff;
-            z-index: 10;
-            font-family: sans-serif;
+            justify-content: center;
+            padding: 24px;
             text-align: center;
-        }
-        #title-screen h1 {
-            margin: 0 0 20px 0;
-            font-size: 64px;
-            line-height: 1.2;
-            text-shadow: 0 4px 8px rgba(0, 0, 0, 0.6);
-        }
-        #start-button {
-            padding: 12px 24px;
-            font-size: 32px;
-            border: none;
-            border-radius: 8px;
-            background: #0077cc;
+            background: radial-gradient(circle at 50% 40%, #1d1d2e, #000);
             color: #fff;
-            cursor: pointer;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+            z-index: 30;
+            font-size: clamp(18px, 5vw, 30px);
+            line-height: 1.4;
         }
-        #start-button:hover {
-            background: #0090ff;
-        }
-        /* Title background image */
-        #title-bg {
-            position: absolute;
-            top: 0;
+
+        #mobileControls {
+            position: fixed;
             left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            z-index: -1;
-            filter: brightness(0.8);
+            right: 0;
+            bottom: 0;
+            z-index: 20;
+            display: none;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 20px;
+            padding: 14px;
+            pointer-events: none;
+        }
+
+        #joystickZone {
+            width: min(34vw, 180px);
+            height: min(34vw, 180px);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            pointer-events: auto;
+            touch-action: none;
+        }
+
+        #actionButtons {
+            display: flex;
+            gap: 10px;
+            pointer-events: auto;
+        }
+
+        .actionBtn {
+            width: min(22vw, 110px);
+            height: min(22vw, 110px);
+            border: 2px solid rgba(255, 255, 255, 0.55);
+            border-radius: 999px;
+            background: rgba(10, 10, 10, 0.45);
+            color: #fff;
+            font-size: clamp(14px, 3.2vw, 20px);
+            font-weight: 700;
+            touch-action: none;
+            user-select: none;
+        }
+
+        .actionBtn:active,
+        .actionBtn.pressed {
+            background: rgba(255, 170, 0, 0.65);
+            border-color: #ffd36a;
+        }
+
+        @media (orientation: landscape) {
+            #mobileControls {
+                display: flex;
+            }
+        }
+
+        @media (orientation: portrait) {
+            #gameCanvas {
+                display: none;
+            }
+
+            #mobileControls {
+                display: none;
+            }
+
+            #rotateNotice {
+                display: flex;
+            }
         }
     </style>
 </head>
 <body>
-    <!-- Title screen overlay -->
-    <div id="title-screen">
-        <img id="title-bg" src="title_bg.png" alt="Title Background">
-        <h1>Alice: Valkyrie Star</h1>
-        <button id="start-button" onclick="startGame()">Start Game</button>
+    <canvas id="gameCanvas"></canvas>
+    <div id="rotateNotice">Rotate your device to landscape to play.</div>
+    <div id="mobileControls" aria-hidden="true">
+        <div id="joystickZone"></div>
+        <div id="actionButtons">
+            <button id="jumpBtn" class="actionBtn" type="button">JUMP</button>
+            <button id="attackBtn" class="actionBtn" type="button">ATTACK</button>
+        </div>
     </div>
-    <!-- Game canvas -->
-    <canvas id="gameCanvas" width="1024" height="640"></canvas>
-    <script src="game.js" data-game-script="true"></script>
+    <script src="https://cdn.jsdelivr.net/npm/nipplejs@0.10.2/dist/nipplejs.min.js"></script>
+    <script src="game.js"></script>
 </body>
 </html>
