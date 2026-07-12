@@ -415,7 +415,9 @@
     };
 
     // ============ LEVEL DATA ============
-    // Commander Keen style: multiple corridors at different Y levels
+    // Surface + underground routes inspired by Commander Keen 4:
+    // readable outdoor ground, village/set-piece landmarks, and
+    // branching cave puzzle paths below.
     const CORRIDORS = [
         { y: 200, name: 'upper' },    // Upper corridor
         { y: 380, name: 'middle' },   // Middle corridor  
@@ -436,6 +438,7 @@
     let decorations = [];
     let roomWalls = [];
     let cornerBlocks = [];
+    let sideBlocks = [];
     let roomCaps = [];
     let roomBackdrops = [];
 
@@ -452,257 +455,234 @@
         decorations = [];
         roomWalls = [];
         cornerBlocks = [];
+        sideBlocks = [];
         roomCaps = [];
         roomBackdrops = [];
 
-        // Build explicit multi-floor "rooms" connected by short hallways.
-        const roomWidth = 860;
-        const hallWidth = 300;
-        const roomCount = Math.floor((LEVEL_WIDTH - 320) / (roomWidth + hallWidth));
         const enemyTypes = ['enemy1', 'enemy2', 'enemy3', 'enemy4'];
-        const decorCycle = ['torch', 'barrel', 'rocks', 'tree', 'house1', 'house2', 'treasure'];
+        const addPlatform = (x, y, w, type = 'floor', options = {}) => {
+            const platform = { x, y, w, type, corridor: options.corridor ?? -1 };
+            if (options.surface) platform.surface = true;
+            if (options.isCave || type === 'cave') platform.isCave = true;
+            platforms.push(platform);
 
-        for (let i = 0; i < roomCount; i++) {
-            const roomX = 160 + i * (roomWidth + hallWidth);
-            const roomPhase = i / Math.max(1, roomCount - 1);
-            const zone = roomPhase < 0.34 ? 'open' : (roomPhase < 0.68 ? 'puzzle' : 'tight');
-            const isDeep = i >= Math.floor(roomCount * 0.6);
-            const roomTop = zone === 'open' ? CORRIDORS[0].y - 230 : (zone === 'tight' ? CORRIDORS[0].y - 100 : CORRIDORS[0].y - 140);
-            const roomBottom = zone === 'open' ? CORRIDORS[4].y + 130 : (zone === 'tight' ? CORRIDORS[4].y + 30 : CORRIDORS[4].y + 80);
-            const interiorInset = zone === 'tight' ? 26 : 34;
-            const floorCorridors = [];
-            const corridorOrNearest = preferred => {
-                if (floorCorridors.includes(preferred)) return preferred;
-                if (!floorCorridors.length) return preferred;
-                let best = floorCorridors[0];
-                let bestDist = Math.abs(best - preferred);
-                for (let k = 1; k < floorCorridors.length; k++) {
-                    const c = floorCorridors[k];
-                    const dist = Math.abs(c - preferred);
-                    if (dist < bestDist) {
-                        best = c;
-                        bestDist = dist;
-                    }
-                }
-                return best;
-            };
-
-            // Hard room shells so each zone reads as an enclosed interior.
-            if (zone !== 'open') {
-                roomWalls.push({ x: roomX - 26, y: roomTop, h: roomBottom - roomTop, side: 'left' });
-                roomWalls.push({ x: roomX + roomWidth - 38, y: roomTop, h: roomBottom - roomTop, side: 'right' });
-                roomCaps.push({ x: roomX - 24, y: roomTop - 22, w: roomWidth + 36 });
-                roomBackdrops.push({
-                    x: roomX + interiorInset,
-                    y: roomTop + 16,
-                    w: roomWidth - interiorInset * 2,
-                    h: roomBottom - roomTop - 30
-                });
+            if (options.caps !== false) {
+                const sideKind = type === 'cave' ? 'wallSide' : 'ledgeSide';
+                sideBlocks.push({ x: x - 42, y: y - 4, w: 46, h: 86, side: 'left', kind: sideKind });
+                sideBlocks.push({ x: x + w - 4, y: y - 4, w: 46, h: 86, side: 'right', kind: sideKind });
             }
+            return platform;
+        };
 
-            // Floor slices per corridor create a room stack silhouette.
-            CORRIDORS.forEach((corridor, idx) => {
-                const floorY = corridor.y;
-                const type = idx >= 3 || isDeep ? 'cave' : (idx % 2 === 0 ? 'floor' : 'floor1');
-                const placeFloor = zone === 'open' ? idx % 2 === 0 : true;
-                if (!placeFloor) return;
-                floorCorridors.push(idx);
+        const addGround = (x, y, w, options = {}) => {
+            addPlatform(x, y, w, options.type || 'floor', { ...options, surface: true, caps: options.caps ?? false });
+            addPlatform(x, y + 64, w, 'cave', { isCave: true, caps: false });
+        };
 
-                platforms.push({ x: roomX, y: floorY, w: roomWidth, type, isCave: idx >= 3 || isDeep, corridor: idx });
+        const addBackdrop = (x, y, w, h, openTop = false) => {
+            roomBackdrops.push({ x, y, w, h });
+            if (!openTop) roomCaps.push({ x: x - 18, y: y - 22, w: w + 36 });
+        };
 
-                // Fewer mezzanine ledges to keep each room readable.
-                if (idx <= 2) {
-                    if ((i + idx) % 2 === 0) {
-                        platforms.push({ x: roomX + 180, y: floorY - 110, w: 140, type: 'ledge', isCave: false, corridor: -1 });
-                    } else {
-                        platforms.push({ x: roomX + roomWidth - 320, y: floorY - 110, w: 140, type: 'ledge', isCave: false, corridor: -1 });
-                    }
-                }
+        const addWall = (x, y, h, side = 'left') => roomWalls.push({ x, y, h, side });
 
-                // Ledge end-caps should sit flush at platform edges.
-                cornerBlocks.push({ x: roomX - 8, y: floorY - 50, w: 60, h: 50, corridor: idx, kind: 'ledgeCap' });
-                cornerBlocks.push({ x: roomX + roomWidth - 52, y: floorY - 50, w: 60, h: 50, corridor: idx, kind: 'ledgeCap' });
+        const addDecor = (type, x, floorY) => {
+            decorations.push({ type, x: Math.round(x / TILE_SIZE) * TILE_SIZE, floorY });
+        };
+
+        const addInteriorCluster = (x, floorY, variant = 0) => {
+            const clusters = [
+                [['torch', -40], ['barrel', 70], ['rocks', 210], ['runes', 360]],
+                [['rocks', -20], ['torch', 130], ['treasure', 270], ['barrel', 430]],
+                [['barrel', -30], ['runes', 120], ['torch', 280], ['rocks', 430]]
+            ];
+            clusters[variant % clusters.length].forEach(([type, dx]) => addDecor(type, x + dx, floorY));
+        };
+
+        const addEnemy = (type, x, floorY, range = 120, attackPattern = 0) => {
+            const size = ENEMY_SIZES[type];
+            enemies.push({
+                x,
+                y: floorY - size.h,
+                type,
+                startX: x,
+                startY: floorY - size.h,
+                range,
+                dir: x % 2 === 0 ? 1 : -1,
+                frame: 0,
+                frameTime: 0,
+                health: 35 + attackPattern * 10,
+                alive: true,
+                attackPattern,
+                attackCooldown: 0,
+                projectiles: [],
+                vx: 0,
+                vy: 0
             });
+        };
 
-            // Zone-specific pacing: open arena, puzzle staircase, tight tunnel.
-            if (zone === 'puzzle') {
-                platforms.push({ x: roomX + 130, y: CORRIDORS[2].y - 150, w: 120, type: 'step', isCave: false, corridor: -1 });
-                platforms.push({ x: roomX + 320, y: CORRIDORS[1].y - 120, w: 120, type: 'ledge', isCave: false, corridor: -1 });
-                platforms.push({ x: roomX + 510, y: CORRIDORS[2].y - 210, w: 120, type: 'step', isCave: false, corridor: -1 });
-                platforms.push({ x: roomX + 690, y: CORRIDORS[1].y - 180, w: 120, type: 'ledge', isCave: false, corridor: -1 });
-            }
-            if (zone === 'tight') {
-                platforms.push({ x: roomX + 80, y: CORRIDORS[1].y + 20, w: 680, type: 'cave', isCave: true, corridor: -1 });
-                platforms.push({ x: roomX + 130, y: CORRIDORS[3].y - 60, w: 600, type: 'cave', isCave: true, corridor: -1 });
-            }
-
-            // Hall connector on main corridor.
-            if (i < roomCount - 1) {
-                if (zone === 'puzzle') {
-                    // Leave a center gap and bridge it with timing-based motion.
-                    platforms.push({
-                        x: roomX + roomWidth,
-                        y: CORRIDORS[2].y,
-                        w: 110,
-                        type: 'floor1',
-                        isCave: false,
-                        corridor: 2
-                    });
-                    platforms.push({
-                        x: roomX + roomWidth + 190,
-                        y: CORRIDORS[2].y,
-                        w: 110,
-                        type: 'floor1',
-                        isCave: false,
-                        corridor: 2
-                    });
-                    movingPlatforms.push({
-                        x: roomX + roomWidth + 145,
-                        y: CORRIDORS[2].y - 72,
-                        startX: roomX + roomWidth + 145,
-                        range: 70,
-                        speed: 75,
-                        dir: i % 2 === 0 ? 1 : -1,
-                        sprite: 'floatAlt'
-                    });
-                } else {
-                    platforms.push({
-                        x: roomX + roomWidth,
-                        y: CORRIDORS[2].y,
-                        w: hallWidth,
-                        type: zone === 'tight' ? 'cave' : 'floor1',
-                        isCave: zone === 'tight',
-                        corridor: 2
-                    });
-
-                    if (zone === 'open') {
-                        platforms.push({
-                            x: roomX + roomWidth,
-                            y: CORRIDORS[0].y,
-                            w: hallWidth,
-                            type: 'floor',
-                            isCave: false,
-                            corridor: 0
-                        });
-                    }
-                }
-            }
-
-            // Vertical connectors so rooms feel navigable by floor.
-            if (i % 2 === 0) {
-                const shaftX = roomX + roomWidth * 0.52;
-                lifts.push({
-                    x: shaftX,
-                    y: CORRIDORS[4].y - 40,
-                    topY: CORRIDORS[0].y - 40,
-                    bottomY: CORRIDORS[4].y - 40,
-                    speed: 82,
-                    dir: -1,
-                    chainLen: 0
+        const addJumpChain = (startX, startY, steps, cave = false) => {
+            steps.forEach((step, idx) => {
+                addPlatform(startX + step[0], startY + step[1], step[2], idx % 2 === 0 ? 'ledge' : 'step', {
+                    isCave: cave,
+                    caps: true
                 });
-            } else {
-                for (let c = 0; c < CORRIDORS.length - 1; c += 2) {
-                    const midY = (CORRIDORS[c].y + CORRIDORS[c + 1].y) / 2;
-                    platforms.push({ x: roomX + roomWidth * 0.26, y: midY, w: 110, type: 'ledge', isCave: c >= 2, corridor: -1 });
-                    platforms.push({ x: roomX + roomWidth * 0.7, y: midY, w: 110, type: 'ledge', isCave: c >= 2, corridor: -1 });
-                }
-            }
+            });
+        };
 
-            // Moving platforms every other room to avoid clutter.
-            if (i % 2 === 0) {
-                movingPlatforms.push({
-                    x: roomX + 230,
-                    y: CORRIDORS[(i % 3) + 1].y - 60,
-                    startX: roomX + 230,
-                    range: 180,
-                    speed: 95,
-                    dir: i % 2 === 0 ? 1 : -1,
-                    sprite: i % 4 === 0 ? 'floatAlt' : 'hFloat'
-                });
-            }
+        // Surface route: rolling ground, village landmarks, trees, and broken cliffs.
+        [
+            [0, 560, 720, 'floor'],
+            [820, 560, 420, 'floor1'],
+            [1340, 520, 620, 'floor'],
+            [2080, 560, 520, 'floor1'],
+            [2760, 540, 560, 'floor'],
+            [3500, 560, 360, 'floor1'],
+            [4160, 520, 520, 'floor'],
+            [4900, 560, 520, 'floor1'],
+            [5660, 540, 420, 'floor'],
+            [6340, 560, 560, 'floor1'],
+            [7240, 520, 620, 'floor']
+        ].forEach(([x, y, w, type]) => addGround(x, y, w, { type, corridor: 2 }));
 
-            // Collectibles and encounters per room.
-            jewels.push({ x: roomX + roomWidth * 0.5, y: CORRIDORS[i % CORRIDORS.length].y - 85, collected: false });
-            if (i % 2 === 1) {
-                stars.push({ x: roomX + roomWidth * 0.78, y: CORRIDORS[(i + 1) % CORRIDORS.length].y - 65, collected: false });
-            }
-            if (i > 0 && i % 2 === 0) {
-                checkpoints.push({ x: roomX + roomWidth * 0.08, y: CORRIDORS[2].y - 90, activated: false });
-            }
+        // Surface scenery tells the player where they are, not just what to jump on.
+        [
+            ['tree', 210, 560], ['rocks', 430, 560], ['house1', 920, 560],
+            ['barrel', 1110, 560], ['tree', 1470, 520], ['house2', 2260, 560],
+            ['tree', 2860, 540], ['rocks', 3130, 540], ['barrel', 3660, 560],
+            ['house1', 4320, 520], ['tree', 5070, 560], ['rocks', 5850, 540],
+            ['house2', 6420, 560], ['tree', 7470, 520], ['treasure', 7700, 520]
+        ].forEach(([type, x, y]) => addDecor(type, x, y));
 
-            const enemyLanes = zone === 'puzzle' ? 1 : (zone === 'tight' ? 3 : 2);
-            const preferredEnemyCorridors = [1, 2, 3, 0, 4].map(corridorOrNearest);
-            for (let lane = 0; lane < enemyLanes; lane++) {
-                const type = enemyTypes[(i + lane) % enemyTypes.length];
-                const enemyCorridor = preferredEnemyCorridors[lane % preferredEnemyCorridors.length];
-                enemies.push({
-                    x: roomX + 220 + lane * 260,
-                    y: CORRIDORS[enemyCorridor].y - ENEMY_SIZES[type].h,
-                    type,
-                    startX: roomX + 220 + lane * 260,
-                    startY: CORRIDORS[enemyCorridor].y - ENEMY_SIZES[type].h,
-                    range: zone === 'tight' ? 90 : 120,
-                    dir: lane % 2 === 0 ? 1 : -1,
-                    frame: 0,
-                    frameTime: 0,
-                    health: 35 + lane * 10,
-                    alive: true,
-                    attackPattern: (i + lane) % 4,
-                    attackCooldown: 0,
-                    projectiles: [],
-                    vx: 0,
-                    vy: 0
-                });
-            }
+        [
+            ['tree', 40, 560], ['barrel', 640, 560], ['torch', 970, 560],
+            ['rocks', 1680, 520], ['tree', 1880, 520], ['torch', 2360, 560],
+            ['house1', 2910, 540], ['barrel', 3220, 540], ['tree', 4230, 520],
+            ['torch', 4440, 520], ['rocks', 5160, 560], ['house2', 5820, 540],
+            ['barrel', 6030, 540], ['torch', 6470, 560], ['rocks', 7270, 520]
+        ].forEach(([type, x, y]) => addDecor(type, x, y));
 
-            if (i > 0) {
-                if (zone === 'puzzle') {
-                    const spikeCorridor = corridorOrNearest(2);
-                    const lavaCorridor = corridorOrNearest(3);
-                    hazards.push({ x: roomX + roomWidth * 0.42, y: CORRIDORS[spikeCorridor].y - 6, type: 'spike', w: 110, hitH: 48, drawH: 56 });
-                    hazards.push({ x: roomX + roomWidth * 0.6, y: CORRIDORS[lavaCorridor].y - 35, type: 'lava', w: 120, variant: 'alt' });
-                } else if (zone === 'tight') {
-                    const upperCorridor = corridorOrNearest(2);
-                    const lowerCorridor = corridorOrNearest(3);
-                    hazards.push({ x: roomX + 170, y: CORRIDORS[upperCorridor].y - 6, type: 'spike', w: 150, hitH: 48, drawH: 56 });
-                    hazards.push({ x: roomX + roomWidth - 320, y: CORRIDORS[lowerCorridor].y - 6, type: 'spike', w: 150, hitH: 48, drawH: 56 });
-                } else {
-                    const corridor = corridorOrNearest(3);
-                    hazards.push({
-                        x: roomX + roomWidth * 0.5 - 70,
-                        y: CORRIDORS[corridor].y + (i % 2 === 0 ? -6 : -35),
-                        type: i % 2 === 0 ? 'spike' : 'lava',
-                        w: 140,
-                        variant: i % 2 === 0 ? null : 'wide',
-                        hitH: i % 2 === 0 ? 48 : 30,
-                        drawH: i % 2 === 0 ? 56 : 45
-                    });
-                }
-            }
+        // Upper secret ledges and hard outdoor jump chains.
+        addJumpChain(620, 430, [[0, 0, 130], [210, -70, 120], [410, -130, 115], [620, -70, 130]], false);
+        addJumpChain(1960, 470, [[0, 0, 115], [180, -75, 105], [365, -145, 105], [555, -215, 120], [760, -150, 105]], false);
+        addJumpChain(3860, 430, [[0, 0, 120], [190, -80, 110], [410, -135, 115], [640, -90, 100]], false);
+        addJumpChain(6080, 460, [[0, 0, 105], [175, -70, 105], [350, -140, 105], [530, -210, 120]], false);
+        addJumpChain(4960, 440, [[0, 0, 95], [155, -80, 90], [315, -160, 90], [500, -245, 100], [705, -170, 95]], false);
 
-            // Three set pieces per room for cleaner visual reads.
-            const decorCount = zone === 'tight' ? 2 : 3;
-            const preferredDecorCorridors = [0, 1, 2].map(corridorOrNearest);
-            for (let dIdx = 0; dIdx < decorCount; dIdx++) {
-                const type = decorCycle[(i * 2 + dIdx) % decorCycle.length];
-                const corridorIdx = preferredDecorCorridors[dIdx % preferredDecorCorridors.length];
-                const floorY = CORRIDORS[corridorIdx].y;
-                const decoX = roomX + 120 + dIdx * 240;
-                decorations.push({
-                    x: Math.round(decoX / TILE_SIZE) * TILE_SIZE,
-                    floorY,
-                    type
-                });
-            }
-        }
+        // Main route hazards force vertical detours instead of a flat run.
+        hazards.push({ x: 730, y: 525, type: 'spike', w: 90, hitH: 42, drawH: 52 });
+        hazards.push({ x: 1240, y: 525, type: 'lava', w: 100, variant: 'wide', hitH: 30, drawH: 45 });
+        hazards.push({ x: 1960, y: 485, type: 'spike', w: 120, hitH: 42, drawH: 52 });
+        hazards.push({ x: 2620, y: 525, type: 'lava', w: 140, variant: 'alt', hitH: 34, drawH: 48 });
+        hazards.push({ x: 3860, y: 525, type: 'spike', w: 180, hitH: 42, drawH: 52 });
+        hazards.push({ x: 5220, y: 525, type: 'lava', w: 180, variant: 'wide', hitH: 34, drawH: 48 });
+        hazards.push({ x: 6980, y: 525, type: 'spike', w: 190, hitH: 42, drawH: 52 });
+        hazards.push({ x: 3400, y: 525, type: 'lava', w: 100, variant: 'alt', hitH: 34, drawH: 48 });
+        hazards.push({ x: 6080, y: 505, type: 'spike', w: 130, hitH: 42, drawH: 52 });
 
-        if (checkpoints.length === 0) {
-            checkpoints.push({ x: 420, y: CORRIDORS[2].y - 90, activated: false });
-        }
+        // Underground cave network: asymmetrical tunnels, shafts, and backtracking rewards.
+        [
+            [700, 740, 560], [1480, 740, 360], [2220, 720, 520],
+            [3000, 760, 760], [4020, 720, 460], [4680, 780, 620],
+            [5600, 740, 520], [6520, 760, 680], [7240, 700, 440]
+        ].forEach(([x, y, w]) => addPlatform(x, y, w, 'cave', { isCave: true, corridor: 3 }));
+
+        [
+            [960, 920, 620], [1880, 940, 700], [2860, 920, 520],
+            [3820, 980, 700], [4920, 940, 680], [6060, 960, 720]
+        ].forEach(([x, y, w]) => addPlatform(x, y, w, 'cave', { isCave: true, corridor: 4 }));
+
+        // Cave ceilings and side walls are visual only, leaving jumps readable.
+        [
+            [620, 650, 1220, 360], [2120, 635, 1220, 410], [3820, 620, 1360, 470],
+            [5600, 650, 1420, 420]
+        ].forEach(([x, y, w, h]) => addBackdrop(x, y, w, h));
+        [[620, 650, 360], [1830, 650, 360], [2120, 635, 410], [3310, 635, 410],
+         [3820, 620, 470], [5140, 620, 470], [5600, 650, 420], [6990, 650, 420]]
+            .forEach(([x, y, h], idx) => addWall(x, y, h, idx % 2 === 0 ? 'left' : 'right'));
+
+        // Branch connectors: ledges, lifts, and timed platforms between surface and caves.
+        addJumpChain(760, 665, [[0, 0, 105], [180, -70, 105], [360, -130, 105]], true);
+        addJumpChain(1410, 670, [[0, 0, 110], [170, 80, 120], [360, 155, 110], [550, 85, 120]], true);
+        addJumpChain(2560, 650, [[0, 0, 105], [190, 72, 105], [380, 140, 105], [590, 70, 115]], true);
+        addJumpChain(4360, 650, [[0, 0, 105], [190, 72, 100], [380, 142, 105], [575, 215, 110]], true);
+        addJumpChain(5960, 675, [[0, 0, 110], [180, -80, 105], [370, -150, 105], [580, -90, 110]], true);
+        addJumpChain(1760, 865, [[0, 0, 96], [170, -78, 92], [345, -150, 92], [520, -84, 98]], true);
+        addJumpChain(5000, 875, [[0, 0, 92], [155, -82, 90], [320, -164, 90], [500, -246, 100]], true);
+
+        lifts.push({ x: 1180, y: 880, topY: 500, bottomY: 880, speed: 88, dir: -1, chainLen: 0 });
+        lifts.push({ x: 3440, y: 900, topY: 540, bottomY: 900, speed: 92, dir: -1, chainLen: 0 });
+        lifts.push({ x: 7050, y: 880, topY: 520, bottomY: 880, speed: 86, dir: -1, chainLen: 0 });
+
+        movingPlatforms.push({ x: 1280, y: 675, startX: 1280, range: 150, speed: 95, dir: 1, sprite: 'hFloat' });
+        movingPlatforms.push({ x: 2680, y: 620, startX: 2680, range: 190, speed: 105, dir: -1, sprite: 'floatAlt' });
+        movingPlatforms.push({ x: 5410, y: 700, startX: 5410, range: 180, speed: 110, dir: 1, sprite: 'hFloat' });
+        movingPlatforms.push({ x: 6760, y: 625, startX: 6760, range: 160, speed: 100, dir: -1, sprite: 'floatAlt' });
+        movingPlatforms.push({ x: 1900, y: 830, startX: 1900, range: 210, speed: 120, dir: 1, sprite: 'hFloat' });
+        movingPlatforms.push({ x: 3980, y: 840, startX: 3980, range: 150, speed: 130, dir: -1, sprite: 'floatAlt' });
+        movingPlatforms.push({ x: 6160, y: 815, startX: 6160, range: 210, speed: 118, dir: 1, sprite: 'hFloat' });
+
+        // Rewards deliberately sit on alternate paths.
+        jewels.push({ x: 830, y: 240, collected: false });
+        jewels.push({ x: 2510, y: 510, collected: false });
+        jewels.push({ x: 3060, y: 835, collected: false });
+        jewels.push({ x: 4570, y: 880, collected: false });
+        jewels.push({ x: 6330, y: 210, collected: false });
+        jewels.push({ x: 7460, y: 420, collected: false });
+        stars.push({ x: 1540, y: 850, collected: false });
+        stars.push({ x: 4680, y: 305, collected: false });
+        stars.push({ x: 6100, y: 875, collected: false });
+        stars.push({ x: 5460, y: 180, collected: false });
+
+        checkpoints.push({ x: 1010, y: 650, activated: false });
+        checkpoints.push({ x: 3270, y: 670, activated: false });
+        checkpoints.push({ x: 5730, y: 650, activated: false });
+
+        // Enemies are placed by encounter shape rather than per-room quota.
+        [
+            ['enemy1', 520, 560, 130, 0], ['enemy2', 1520, 520, 150, 1],
+            ['enemy3', 2320, 560, 120, 2], ['enemy1', 3020, 540, 130, 0],
+            ['enemy4', 4380, 520, 95, 3], ['enemy2', 5740, 540, 120, 1],
+            ['enemy3', 6560, 560, 150, 2], ['enemy1', 7440, 520, 100, 0],
+            ['enemy2', 930, 740, 120, 1], ['enemy4', 2260, 720, 90, 3],
+            ['enemy3', 3180, 760, 130, 2], ['enemy1', 4160, 720, 120, 0],
+            ['enemy4', 5020, 780, 90, 3], ['enemy2', 6220, 960, 130, 1]
+        ].forEach(([type, x, floorY, range, pattern]) => addEnemy(type, x, floorY, range, pattern));
+
+        // Cave dressing and landmarks.
+        [
+            ['torch', 760, 740], ['barrel', 1060, 740], ['rocks', 1550, 740],
+            ['torch', 2300, 720], ['treasure', 3020, 920], ['rocks', 3900, 980],
+            ['torch', 4280, 720], ['barrel', 4840, 780], ['rocks', 5660, 740],
+            ['torch', 6260, 960], ['treasure', 6840, 760], ['runes', 7240, 700]
+        ].forEach(([type, x, y]) => addDecor(type, x, y));
+
+        addInteriorCluster(860, 740, 0);
+        addInteriorCluster(2250, 720, 1);
+        addInteriorCluster(3050, 760, 2);
+        addInteriorCluster(4020, 720, 0);
+        addInteriorCluster(4950, 780, 1);
+        addInteriorCluster(6060, 960, 2);
+        addInteriorCluster(6600, 760, 0);
+
+        [
+            [1120, 706, 90], [1640, 706, 120], [2480, 686, 110], [3260, 726, 130],
+            [4120, 686, 120], [4740, 746, 150], [5840, 706, 110], [6640, 726, 160],
+            [1260, 886, 130], [2200, 906, 150], [3020, 886, 110], [4300, 946, 170],
+            [5360, 906, 130], [6420, 926, 160]
+        ].forEach(([x, y, w], idx) => hazards.push({
+            x,
+            y,
+            type: idx % 3 === 0 ? 'lava' : 'spike',
+            w,
+            variant: idx % 3 === 0 ? 'wide' : null,
+            hitH: idx % 3 === 0 ? 32 : 42,
+            drawH: idx % 3 === 0 ? 46 : 52
+        }));
 
         exitPortal = {
-            x: Math.min(LEVEL_WIDTH - 280, 160 + (roomCount - 1) * (roomWidth + hallWidth) + roomWidth - 160),
-            y: CORRIDORS[2].y - 140,
+            x: LEVEL_WIDTH - 360,
+            y: 390,
             open: false
         };
     }
@@ -1111,33 +1091,56 @@
 
     // ============ DRAWING ============
     function drawBackground() {
-        // Multi-layer parallax for depth
+        const underground = Math.max(0, Math.min(1, (cameraY - 420) / 440));
         const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-        gradient.addColorStop(0, '#0a0515');
-        gradient.addColorStop(0.3, '#15082a');
-        gradient.addColorStop(0.6, '#1a0c35');
-        gradient.addColorStop(1, '#0f0620');
+        gradient.addColorStop(0, underground > 0.55 ? '#080510' : '#153b64');
+        gradient.addColorStop(0.35, underground > 0.55 ? '#130a20' : '#3d6f8e');
+        gradient.addColorStop(0.7, underground > 0.55 ? '#1a0c28' : '#6f8b6b');
+        gradient.addColorStop(1, underground > 0.55 ? '#08040d' : '#23351f');
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
-        // Stars
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-        for (let i = 0; i < 120; i++) {
-            const sx = ((i * 137 + cameraX * 0.02) % (canvas.width + 300)) - 150;
-            const sy = ((i * 73 + cameraY * 0.01) % (canvas.height * 0.8));
-            ctx.fillRect(sx, sy, (i % 3) + 1, (i % 3) + 1);
-        }
-        
-        // Distant mountains (parallax)
-        ctx.fillStyle = 'rgba(30, 15, 50, 0.6)';
-        for (let i = 0; i < 8; i++) {
-            const mx = i * 300 - (cameraX * 0.05) % 300;
-            const mh = 100 + (i * 37) % 100;
+        if (underground < 0.85) {
+            ctx.save();
+            ctx.globalAlpha = 1 - underground;
+            ctx.fillStyle = 'rgba(255, 224, 142, 0.65)';
             ctx.beginPath();
-            ctx.moveTo(mx, canvas.height);
-            ctx.lineTo(mx + 150, canvas.height - mh);
-            ctx.lineTo(mx + 300, canvas.height);
+            ctx.arc(canvas.width * 0.78 - (cameraX * 0.03) % 220, 95 - cameraY * 0.03, 54, 0, Math.PI * 2);
             ctx.fill();
+
+            ctx.fillStyle = 'rgba(37, 51, 55, 0.5)';
+            for (let i = 0; i < 9; i++) {
+                const mx = i * 280 - (cameraX * 0.08) % 280;
+                const mh = 90 + (i * 31) % 80;
+                const baseY = canvas.height * 0.72 - cameraY * 0.08;
+                ctx.beginPath();
+                ctx.moveTo(mx - 40, baseY);
+                ctx.lineTo(mx + 120, baseY - mh);
+                ctx.lineTo(mx + 300, baseY);
+                ctx.fill();
+            }
+
+            ctx.fillStyle = 'rgba(28, 73, 43, 0.55)';
+            for (let i = 0; i < 18; i++) {
+                const hx = i * 190 - (cameraX * 0.18) % 190;
+                const baseY = canvas.height * 0.82 - cameraY * 0.14;
+                ctx.beginPath();
+                ctx.ellipse(hx, baseY, 170, 42 + (i % 3) * 12, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+
+        if (underground > 0.15) {
+            ctx.save();
+            ctx.globalAlpha = underground;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
+            for (let i = 0; i < 60; i++) {
+                const sx = ((i * 173 - cameraX * 0.05) % (canvas.width + 260)) - 130;
+                const sy = ((i * 97 - cameraY * 0.04) % (canvas.height + 220)) - 80;
+                ctx.fillRect(sx, sy, 36 + (i % 4) * 18, 8 + (i % 3) * 6);
+            }
+            ctx.restore();
         }
     }
 
@@ -1179,6 +1182,20 @@
                         for (let tx = 0; tx < p.w; tx += tileStep) {
                             const tw = Math.min(tileStep + 16, p.w - tx + 16);
                             ctx.drawImage(img, drawX + tx, drawY, tw, 70);
+                        }
+                    }
+
+                    if (p.surface) {
+                        ctx.fillStyle = '#4f9a38';
+                        ctx.fillRect(drawX, drawY - 8, p.w, 10);
+                        ctx.fillStyle = '#8bcf4f';
+                        for (let gx = 0; gx < p.w; gx += 18) {
+                            const bladeX = drawX + gx + ((gx / 18) % 3) * 3;
+                            ctx.beginPath();
+                            ctx.moveTo(bladeX, drawY - 8);
+                            ctx.lineTo(bladeX + 5, drawY - 18 - (gx % 4) * 2);
+                            ctx.lineTo(bladeX + 10, drawY - 8);
+                            ctx.fill();
                         }
                     }
                 }
@@ -1292,6 +1309,30 @@
                 );
             });
         }
+    }
+
+    function drawSideBlocks() {
+        sideBlocks.forEach(block => {
+            const drawX = Math.floor(block.x - cameraX);
+            const drawY = Math.floor(block.y - cameraY);
+            if (drawX < -120 || drawX > canvas.width + 120) return;
+
+            const img = block.kind === 'wallSide'
+                ? (images.insideWall || images.insideBase || images.ledge)
+                : (images.ledge || images.floor1 || images.floor);
+            if (!img) return;
+
+            ctx.save();
+            const sideY = drawY + 12;
+            if (block.side === 'right') {
+                ctx.translate(drawX + block.w, sideY);
+                ctx.scale(-1, 1);
+                ctx.drawImage(img, 0, 0, img.width, img.height, 0, 0, block.w, block.h);
+            } else {
+                ctx.drawImage(img, 0, 0, img.width, img.height, drawX, sideY, block.w, block.h);
+            }
+            ctx.restore();
+        });
     }
 
     function drawMovingPlatforms() {
@@ -1640,6 +1681,7 @@
             drawDecorations();
             drawRoomWallsAndCorners();
             drawPlatforms();
+            drawSideBlocks();
             drawMovingPlatforms();
             drawLifts();
             drawHazards();
